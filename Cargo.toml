@@ -1,0 +1,92 @@
+[package]
+name = "sattleme-checkout"
+version = "1.0.0"
+edition = "2024"
+# The oldest Rust the crate and its dependencies build with: ctutils 0.4.3 and later (the
+# constant-time comparison of HMAC tags, RUSTSEC-2026-0385 fixed in 0.4.4) need 1.87, and the test
+# certificates' `time` 0.3.47 and later (RUSTSEC-2026-0009 fixed) 1.88 (README.md, "Requirements").
+# The CI tests it and the pinned stable toolchain.
+rust-version = "1.88"
+description = "Take Lightning and on-chain payments for a sattle.me merchant from an online shop's server: invoices, deposit addresses, registry declarations, payment checks."
+license = "MIT"
+authors = ["sattle.me"]
+homepage = "https://sattle.me"
+repository = "https://github.com/sattleme/checkout-rust"
+documentation = "https://docs.rs/sattleme-checkout"
+readme = "README.md"
+keywords = ["bitcoin", "lightning", "lnurl", "nostr", "payments"]
+categories = ["cryptography::cryptocurrencies", "asynchronous"]
+# What `cargo publish` sends: the library's sources, its README, CHANGELOG, SECURITY and LICENSE.
+# The tests (src/tests/, which read the vectors of spec/), the pinned copy of the specification
+# (spec/), the maintainers' tooling (xtask/) and the CI stay in the repository.
+exclude = [
+  "/.cargo/",
+  "/.github/",
+  "/deny.toml",
+  "/rust-toolchain.toml",
+  "/spec/",
+  "/src/tests/",
+  "/xtask/",
+]
+
+[workspace]
+members = ["xtask"]
+
+# Why each one, and why these versions: README.md, "Dependencies". Each requirement is the
+# version tested and any later compatible one (semver), as Rust crates require theirs; Cargo.lock
+# pins every package of this repository's build exactly, with its checksum, and the CI builds
+# from it as it is (`--locked`). An application resolves the requirements in its own lockfile.
+[dependencies]
+bytes = { version = "1.12.1", default-features = false, features = ["std"] }
+chacha20 = { version = "0.10.2", default-features = false, features = ["cipher"] }
+futures-util = { version = "0.3.34", default-features = false, features = ["std", "sink"] }
+getrandom = { version = "0.4.3", default-features = false }
+hkdf = { version = "0.13.0", default-features = false }
+hmac = { version = "0.13.0", default-features = false }
+http = { version = "1.5.0", default-features = false, features = ["std"] }
+http-body-util = { version = "0.1.5", default-features = false }
+hyper = { version = "1.12.0", default-features = false, features = ["client", "http1"] }
+hyper-util = { version = "0.1.21", default-features = false, features = ["tokio"] }
+log = { version = "0.4.35", default-features = false }
+num-bigint = { version = "0.5.1", default-features = false, features = ["std"] }
+rustls = { version = "0.23.46", default-features = false, features = ["ring", "std", "tls12"] }
+secp256k1 = { version = "0.33.1", default-features = false, features = ["std"] }
+serde = { version = "1.0.229", default-features = false, features = ["std"] }
+sha2 = { version = "0.11.1", default-features = false }
+tokio = { version = "1.54.1", default-features = false, features = ["macros", "net", "rt", "sync", "time"] }
+tokio-rustls = { version = "0.26.6", default-features = false, features = ["ring", "tls12"] }
+tokio-tungstenite = { version = "0.30.0", default-features = false, features = ["handshake"] }
+webpki-roots = { version = "1.0.12", default-features = false }
+zeroize = { version = "1.9.1", default-features = false, features = ["std"] }
+
+[dev-dependencies]
+rcgen = { version = "0.14.10", default-features = false, features = ["ring"] }
+serde_json = { version = "1.0.154", default-features = false, features = ["std"] }
+tokio = { version = "1.54.1", default-features = false, features = ["io-util", "macros", "net", "rt", "rt-multi-thread", "sync", "test-util", "time"] }
+
+[lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+unreachable_pub = "warn"
+unused_qualifications = "warn"
+
+[lints.clippy]
+dbg_macro = "warn"
+print_stderr = "warn"
+print_stdout = "warn"
+todo = "warn"
+unimplemented = "warn"
+
+# The tests sign and open thousands of records (a relay flooded by anybody's records): the
+# cryptography is built optimized for them too, the crate itself as usual.
+[profile.dev.package.secp256k1-sys]
+opt-level = 3
+
+[profile.dev.package.sha2]
+opt-level = 3
+
+[profile.dev.package.chacha20]
+opt-level = 3
+
+[profile.dev.package.hmac]
+opt-level = 3

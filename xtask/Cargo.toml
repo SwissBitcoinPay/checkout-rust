@@ -1,0 +1,13 @@
+[package]
+name = "xtask"
+version = "1.0.0"
+edition = "2024"
+rust-version = "1.88"
+description = "The repository's own tooling: the pinned copy of the specification, every check at once."
+license = "MIT"
+authors = ["sattle.me"]
+publish = false
+
+[dependencies]
+serde_json = { version = "1.0.154", default-features = false, features = ["std"] }
+sha2 = { version = "0.11.1", default-features = false }

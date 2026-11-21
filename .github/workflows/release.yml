@@ -1,0 +1,93 @@
+name: Release
+
+# A maintainer pushes tag vX.Y.Z (= Cargo.toml's version, on main): the crate is checked again,
+# then published on crates.io as sattleme-checkout by crates.io's trusted publishing (OIDC: no
+# stored token), in a job a maintainer approves (the protected environment crates-io). Never from a
+# development or agent session (checkout-spec's PORTING.md, "Releases"). README.md, "Releasing",
+# says what the maintainers set up.
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  checks:
+    uses: ./.github/workflows/ci.yml
+
+  # Before the environment gate, so reviewers are only asked to approve valid releases.
+  verify:
+    name: Verify the tag and the package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Use the runner's own temporary directory
+        run: |
+          {
+            echo "TMPDIR=$RUNNER_TEMP"
+            echo "CARGO_HOME=$RUNNER_TEMP/cargo"
+            echo "RUSTUP_HOME=$RUNNER_TEMP/rustup"
+          } >> "$GITHUB_ENV"
+          echo "$RUNNER_TEMP/cargo/bin" >> "$GITHUB_PATH"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: ./.github/actions/install-rust
+      - name: Tag must match Cargo.toml's version
+        run: |
+          pkgid="$(cargo pkgid --locked --package sattleme-checkout)"
+          expected="v${pkgid##*@}"
+          if [ "$GITHUB_REF_NAME" != "$expected" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match the crate's version ($expected)."
+            exit 1
+          fi
+      - name: Tagged commit must be on main
+        run: |
+          if ! git merge-base --is-ancestor HEAD origin/main; then
+            echo "::error::$GITHUB_REF_NAME points to a commit that is not on main."
+            exit 1
+          fi
+      # The package as crates.io gets it, built and its build checked: the publish job, which can
+      # ask for the OIDC token, builds nothing.
+      - run: cargo publish --dry-run --locked --package sattleme-checkout
+
+  publish:
+    name: cargo publish (sattleme-checkout)
+    needs: [checks, verify]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    # The protected environment (required reviewers: a maintainer approves each release; deployment
+    # tags: v*). crates.io trusts this job alone (trusted publishing: the crate's trusted publisher
+    # is sattleme/checkout-rust, workflow release.yml, environment crates-io), with a token that
+    # lasts 30 minutes, revoked when the job ends.
+    environment: crates-io
+    permissions:
+      contents: read
+      # The OIDC token that crates.io exchanges for the publication's token.
+      id-token: write
+    steps:
+      - name: Use the runner's own temporary directory
+        run: |
+          {
+            echo "TMPDIR=$RUNNER_TEMP"
+            echo "CARGO_HOME=$RUNNER_TEMP/cargo"
+            echo "RUSTUP_HOME=$RUNNER_TEMP/rustup"
+          } >> "$GITHUB_ENV"
+          echo "$RUNNER_TEMP/cargo/bin" >> "$GITHUB_PATH"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/install-rust
+      - uses: rust-lang/crates-io-auth-action@3268eb413133e2960fa4ae0e963ca76380c54cd9 # v1.0.6
+        id: auth
+      # --no-verify: the verify job built this commit's package already; no build script of a
+      # dependency runs where the OIDC token can be asked for.
+      - run: cargo publish --locked --no-verify --package sattleme-checkout
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}

@@ -1,0 +1,30 @@
+# Pull requests that keep the actions and the crate's dependencies up to date: one pull request per
+# ecosystem, grouping all its updates. Each waits a week after a release (cooldown): time for a
+# compromised release to be found and pulled before it reaches this repository. The toolchain
+# (rust-toolchain.toml), rustup (.github/actions/install-rust) and cargo-deny (ci.yml) are updated by
+# hand, a week after their release too.
+version: 2
+updates:
+  # The SHA-pinned actions of .github/workflows/ (and of .github/actions/), in one pull request.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns: ["*"]
+  # The crate's dependencies and xtask's, Cargo.toml and Cargo.lock, in one pull request. Cargo
+  # takes `auto` or `lockfile-only` only: `auto` (Dependabot's default) still proposes a new major
+  # version, which `lockfile-only` would ignore.
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+    versioning-strategy: auto
+    cooldown:
+      default-days: 7
+    groups:
+      cargo:
+        patterns: ["*"]

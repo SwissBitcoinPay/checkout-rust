@@ -1,0 +1,39 @@
+# cargo-deny's checks of the dependencies (the CI's `supply-chain` job, `cargo deny --locked
+# check`): RustSec advisories, licenses, bans and sources. README.md, "Dependencies", says why each
+# dependency is there.
+
+[graph]
+all-features = true
+
+[advisories]
+# An advisory of the RustSec database (a vulnerability, an unmaintained or unsound crate) or a
+# yanked version fails the check: none is ignored.
+yanked = "deny"
+ignore = []
+
+[licenses]
+# The licenses of the dependency graph, all compatible with the crate's MIT license (of a choice,
+# the crate takes MIT).
+allow = [
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "BSD-3-Clause",
+  "CC0-1.0",
+  "CDLA-Permissive-2.0",
+  "ISC",
+  "MIT",
+  "Unicode-3.0",
+]
+confidence-threshold = 0.93
+
+[bans]
+# No version requirement `*`; several versions of one crate are reported, not refused (the
+# dependencies' own choices).
+wildcards = "deny"
+multiple-versions = "warn"
+
+[sources]
+# crates.io only: no other registry, no git dependency.
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

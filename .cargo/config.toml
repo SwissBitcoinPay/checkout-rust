@@ -1,0 +1,4 @@
+# `cargo xtask <command>`: the repository's own tooling (xtask/src/main.rs), not part of the
+# published crate. `cargo xtask check` runs every check the CI runs.
+[alias]
+xtask = "run --locked --quiet --package xtask --"

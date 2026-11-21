@@ -1,0 +1,43 @@
+name: Install Rust
+description: >-
+  rustup at a pinned version, its SHA-256 checked before it runs, then a toolchain: the one of
+  rust-toolchain.toml (its components with it), or the one given. Under the job's CARGO_HOME and
+  RUSTUP_HOME (in RUNNER_TEMP, set by the job's first step): no root needed, nothing kept after
+  the job.
+inputs:
+  toolchain:
+    description: A toolchain to install in place of rust-toolchain.toml's (a version, as 1.88.0).
+    required: false
+    default: ""
+runs:
+  using: composite
+  steps:
+    - name: Install rustup
+      shell: bash
+      env:
+        # Pinned, as every tool of the CI: rustup 1.29.3, the SHA-256 of its x86_64 Linux
+        # rustup-init. rustup checks each toolchain it downloads against its channel's manifest.
+        RUSTUP_VERSION: "1.29.3"
+        RUSTUP_INIT_SHA256: b1c8cb14e30889e7e2999e6b69e62d9e9b9ffc0f4df8180564d306d9680e6c55
+      run: |
+        set -euo pipefail
+        init="$RUNNER_TEMP/rustup-init"
+        curl --proto '=https' --tlsv1.2 --fail --silent --show-error --location --output "$init" \
+          "https://static.rust-lang.org/rustup/archive/$RUSTUP_VERSION/x86_64-unknown-linux-gnu/rustup-init"
+        echo "$RUSTUP_INIT_SHA256  $init" | sha256sum --check --strict
+        chmod +x "$init"
+        "$init" -y --no-modify-path --profile minimal --default-toolchain none
+        rm "$init"
+    - name: Install the toolchain
+      shell: bash
+      env:
+        TOOLCHAIN: ${{ inputs.toolchain }}
+      run: |
+        set -euo pipefail
+        if [ -n "$TOOLCHAIN" ]; then
+          rustup toolchain install "$TOOLCHAIN" --profile minimal --no-self-update
+        else
+          # rust-toolchain.toml's: its channel, profile and components.
+          rustup toolchain install --no-self-update
+        fi
+        rustup show

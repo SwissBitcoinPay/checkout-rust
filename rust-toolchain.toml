@@ -1,0 +1,7 @@
+# The toolchain of the checks (cargo fmt, cargo clippy, cargo test, cargo doc), pinned so that a
+# new release of Rust or of its lints never changes them unannounced. The CI tests the crate's
+# `rust-version` (Cargo.toml) as well.
+[toolchain]
+channel = "1.100.0"
+components = ["clippy", "rustfmt"]
+profile = "minimal"

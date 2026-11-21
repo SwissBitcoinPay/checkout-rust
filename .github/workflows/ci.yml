@@ -1,0 +1,89 @@
+name: CI
+
+# Every pull request and every push to main: the pinned copy of the specification, the format, the
+# lints, the tests (the conformance vectors, local relays and fakes: no network), the documentation
+# and the package, with the pinned toolchain (rust-toolchain.toml); the tests with the oldest Rust
+# the crate supports (Cargo.toml's rust-version); the dependencies' advisories, licenses and
+# sources (cargo-deny).
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  checks:
+    name: Checks (Rust of rust-toolchain.toml)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      # RUNNER_TEMP is the job's own directory, emptied at its start and end: temporary files, and
+      # the tools and caches the job installs, go there. Set here: the job's `env` cannot read the
+      # runner context.
+      - name: Use the runner's own temporary directory
+        run: |
+          {
+            echo "TMPDIR=$RUNNER_TEMP"
+            echo "CARGO_HOME=$RUNNER_TEMP/cargo"
+            echo "RUSTUP_HOME=$RUNNER_TEMP/rustup"
+          } >> "$GITHUB_ENV"
+          echo "$RUNNER_TEMP/cargo/bin" >> "$GITHUB_PATH"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # No cache: the dependencies build from Cargo.lock in a few minutes.
+      - uses: ./.github/actions/install-rust
+      # The pinned specification, cargo fmt, cargo clippy, cargo test, the README's Rust examples
+      # compiled, cargo doc and cargo package, one after the other (xtask/src/main.rs): what a
+      # developer runs.
+      - run: cargo xtask check
+
+  msrv:
+    name: Tests (Rust 1.88.0, Cargo.toml's rust-version)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Use the runner's own temporary directory
+        run: |
+          {
+            echo "TMPDIR=$RUNNER_TEMP"
+            echo "CARGO_HOME=$RUNNER_TEMP/cargo"
+            echo "RUSTUP_HOME=$RUNNER_TEMP/rustup"
+          } >> "$GITHUB_ENV"
+          echo "$RUNNER_TEMP/cargo/bin" >> "$GITHUB_PATH"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/install-rust
+        with:
+          toolchain: 1.88.0
+      - run: cargo +1.88.0 test --locked --package sattleme-checkout
+
+  supply-chain:
+    name: Dependencies (cargo-deny)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Use the runner's own temporary directory
+        run: |
+          {
+            echo "TMPDIR=$RUNNER_TEMP"
+            echo "CARGO_HOME=$RUNNER_TEMP/cargo"
+            echo "RUSTUP_HOME=$RUNNER_TEMP/rustup"
+          } >> "$GITHUB_ENV"
+          echo "$RUNNER_TEMP/cargo/bin" >> "$GITHUB_PATH"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/install-rust
+      # Pinned, with its own lockfile.
+      - run: cargo install --locked cargo-deny --version 0.20.2
+      # deny.toml: RustSec advisories (the database fetched now), licenses, bans, sources.
+      - run: cargo deny --locked check
